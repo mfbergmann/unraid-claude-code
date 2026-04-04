@@ -4,21 +4,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an Unraid plugin that installs Claude Code CLI on Unraid servers. The entire plugin is defined in a single file: `claude-code.plg`.
+This is an Unraid plugin that installs Claude Code CLI on Unraid servers with persistence across reboots. The entire plugin is defined in a single file: `claude-code.plg`.
 
 ## Architecture
 
-The plugin file (`claude-code.plg`) is an XML document containing:
-- Plugin metadata (version, author, URLs, minimum Unraid version)
-- CHANGES section for release notes
-- Embedded shell scripts (install, startup, removal)
-- Embedded PHP for the web UI settings page
-- File creation directives using `<FILE>` elements
+The plugin file (`claude-code.plg`) is an XML document using DOCTYPE entity declarations for maintainability. It contains:
 
-Key components within the plugin:
-- **Install script** (`install-claude.sh`): Installs Claude Code via the official native installer, sets up symlinks for persistent storage
-- **Web UI** (`claude-code.page`): PHP page shown at Settings → Utilities → Claude Code
-- **Startup script** (`rc.claude-code`): rc.d script that waits for network/array, then runs install
+- **Entity declarations**: Plugin name, author, version, URLs — referenced throughout via `&name;`, `&plugdir;`, etc.
+- **Plugin metadata**: Version, author, pluginURL, support URL, icon, minimum Unraid version
+- **CHANGES section**: Release notes (date-based versioning `YYYY.MM.DD`)
+- **FILE elements**: Embedded scripts and configuration files
+
+### Key components within the plugin:
+
+- **Install script** (`scripts/install.sh`): Installs Claude Code via the official native installer, caches the binary on the array, sets up symlinks for persistent config/auth
+- **Web UI** (`claude-code.page`): PHP settings page at Settings → Utilities → Claude Code
+- **Startup script** (`rc.claude-code`): rc.d script that waits for network, then runs install in the background
+- **Config file** (`claude-code.cfg`): Stores the appdata path on the flash drive
+- **Removal script**: Cleans up binaries, symlinks, and go file entries (preserves user data)
+
+### File locations at runtime:
+
+- `/boot/config/plugins/claude-code/` — Persistent config on flash drive
+- `/usr/local/emhttp/plugins/claude-code/` — Plugin runtime files (RAM disk)
+- `/etc/rc.d/rc.claude-code` — Boot startup script
+- `$APPDATA_PATH/` — Cached binary + persistent auth on array
+
+### Persistence strategy:
+
+1. Claude binary is cached on the array (appdata) — restored on boot without re-downloading
+2. `~/.claude` is symlinked to appdata — auth tokens survive reboots
+3. `~/.claude.json` is symlinked to appdata — settings survive reboots
+4. rc.d script in go file ensures setup runs on every boot
+
+## Community Applications
+
+The `claude-code.xml` file is the Community Applications template. It must reference the raw GitHub URL of the `.plg` file on the `main` branch.
 
 ## Development Workflow
 
@@ -45,6 +66,6 @@ git push && git push --tags
 ```
 
 The `.bumpversion.toml` config updates three version locations in `claude-code.plg` automatically:
-- Plugin version attribute
+- Entity version declaration
 - CHANGES section header
 - Post-install message
