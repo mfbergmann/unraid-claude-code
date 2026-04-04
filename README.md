@@ -2,12 +2,20 @@
 
 ![Claude Code Unraid Plugin](assets/banner.jpg)
 
-Installs [Claude Code](https://github.com/anthropics/claude-code) CLI on Unraid.
+Installs [Claude Code](https://github.com/anthropics/claude-code) CLI on Unraid with full persistence across reboots.
+
+## Features
+
+- Installs Claude Code CLI via the official Anthropic installer
+- Binary cached on the array — no re-download needed after reboot
+- Authentication and settings persist automatically via symlinks to appdata
+- Web UI settings page under **Settings > Utilities > Claude Code**
+- Automatic setup on boot via rc.d startup script
 
 ## Install
 
 ```bash
-plugin install https://raw.githubusercontent.com/brianpugh/unraid-claude-code/main/claude-code.plg
+plugin install https://raw.githubusercontent.com/mfbergmann/unraid-claude-code/main/claude-code.plg
 ```
 
 ## Usage
@@ -18,13 +26,21 @@ Open the Unraid terminal and run:
 claude
 ```
 
-Authentication and settings persist across reboots automatically. Configure the appdata path via **Settings > Utilities > Claude Code**.
+On first run, follow the authentication prompts. Your credentials persist automatically.
+
+Configure the appdata path via **Settings > Utilities > Claude Code**.
 
 ## Requirements
 
 - Unraid 6.12.0+
-- Array started, or appdata on an [Unassigned Devices](https://forums.unraid.net/topic/92462-unassigned-devices/) mount
+- Array started (for persistence)
 - Internet connection (first install only)
+
+## How It Works
+
+1. **Binary caching**: The Claude binary is cached at `$APPDATA_PATH/bin/claude` on your array. On reboot, it restores from cache instantly without needing network access.
+2. **Config persistence**: `~/.claude` and `~/.claude.json` are symlinked to your appdata directory, so auth tokens and settings survive reboots.
+3. **Boot startup**: An rc.d script runs in the background on boot, waits for network/array, then restores everything.
 
 ## Troubleshooting
 
@@ -37,7 +53,7 @@ cat /var/log/claude-code-install.log
 Manually re-run the installer:
 
 ```bash
-/usr/local/emhttp/plugins/claude-code/scripts/install-claude.sh
+/usr/local/emhttp/plugins/claude-code/scripts/install.sh
 ```
 
 ## Development
@@ -56,14 +72,9 @@ plugin remove claude-code.plg && plugin install http://YOUR_DEV_IP:8080/claude-c
 
 ### Releasing
 
-This plugin uses date-based versioning (`YYYY.MM.DD`) per Unraid plugin conventions.
+Uses date-based versioning (`YYYY.MM.DD`) per Unraid plugin conventions:
 
 ```bash
-# Update version to today's date, commit, and tag
 bump-my-version replace --new-version 2025.12.01
-
-# Push with tags
 git push && git push --tags
 ```
-
-The release updates version strings in `claude-code.plg` automatically via `.bumpversion.toml`.
