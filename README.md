@@ -1,80 +1,94 @@
-# Claude Code Unraid Plugin
+# Claude Code for Unraid
 
-![Claude Code Unraid Plugin](assets/banner.jpg)
+An Unraid plugin that makes [Claude Code](https://github.com/anthropics/claude-code) — Anthropic's AI coding assistant — persistent on your server. No more reinstalling after every reboot.
 
-Installs [Claude Code](https://github.com/anthropics/claude-code) CLI on Unraid with full persistence across reboots.
+## The Problem
 
-## Features
+Unraid runs from RAM. Anything you install via SSH (including Claude Code) disappears on reboot. This plugin solves that by:
 
-- Installs Claude Code CLI via the official Anthropic installer
-- Binary cached on the array — no re-download needed after reboot
-- Authentication and settings persist automatically via symlinks to appdata
-- Web UI settings page under **Settings > Utilities > Claude Code**
-- Automatic setup on boot via rc.d startup script
+- Caching the Claude binary on your array
+- Symlinking auth tokens and config to your appdata directory
+- Automatically restoring everything on boot via an rc.d startup script
 
-## Install
+## Quick Start
+
+**Install the plugin:**
 
 ```bash
 plugin install https://raw.githubusercontent.com/mfbergmann/unraid-claude-code/main/claude-code.plg
 ```
 
-## Usage
-
-Open the Unraid terminal and run:
+**Open the Unraid terminal and run:**
 
 ```bash
 claude
 ```
 
-On first run, follow the authentication prompts. Your credentials persist automatically.
+Authenticate once. It sticks across reboots.
 
-Configure the appdata path via **Settings > Utilities > Claude Code**.
+## What Gets Persisted
+
+| Item | Location | Purpose |
+|------|----------|---------|
+| Claude binary | `$APPDATA_PATH/bin/claude` | Restored from cache on boot (no download needed) |
+| `~/.claude/` | Symlinked to appdata | Auth tokens, session data |
+| `~/.claude.json` | Symlinked to appdata | User settings and preferences |
+
+The appdata path is auto-detected from your Docker config, or you can set it manually via **Settings > Utilities > Claude Code**.
 
 ## Requirements
 
 - Unraid 6.12.0+
-- Array started (for persistence)
+- Array started (for appdata persistence)
 - Internet connection (first install only)
 
-## How It Works
+## Web UI
 
-1. **Binary caching**: The Claude binary is cached at `$APPDATA_PATH/bin/claude` on your array. On reboot, it restores from cache instantly without needing network access.
-2. **Config persistence**: `~/.claude` and `~/.claude.json` are symlinked to your appdata directory, so auth tokens and settings survive reboots.
-3. **Boot startup**: An rc.d script runs in the background on boot, waits for network/array, then restores everything.
+The plugin adds a settings page at **Settings > Utilities > Claude Code** where you can:
+
+- View installation status, persistence state, and auth status
+- Configure the appdata storage path
+- Reinstall or update Claude Code
+- View the install log
 
 ## Troubleshooting
 
-Check the install log:
+**Check the install log:**
 
 ```bash
 cat /var/log/claude-code-install.log
 ```
 
-Manually re-run the installer:
+**Re-run the installer manually:**
 
 ```bash
 /usr/local/emhttp/plugins/claude-code/scripts/install.sh
 ```
 
+**Claude not found after boot?** The rc.d script runs in the background — it may take a minute to restore the binary while waiting for the array and network. Check the log to see progress.
+
 ## Development
 
 ```bash
-# Serve plugin locally
-cd /path/to/unraid-claude-code
+# Serve the plugin from your dev machine
 python3 -m http.server 8080
 
-# On Unraid terminal - install
+# On the Unraid terminal
 plugin install http://YOUR_DEV_IP:8080/claude-code.plg
 
 # Reinstall after changes
 plugin remove claude-code.plg && plugin install http://YOUR_DEV_IP:8080/claude-code.plg
 ```
 
-### Releasing
+### Versioning
 
-Uses date-based versioning (`YYYY.MM.DD`) per Unraid plugin conventions:
+Date-based (`YYYY.MM.DD`) per Unraid plugin conventions:
 
 ```bash
-bump-my-version replace --new-version 2025.12.01
+bump-my-version replace --new-version 2026.04.04
 git push && git push --tags
 ```
+
+## License
+
+MIT
