@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
   <!ENTITY name      "claude-code">
   <!ENTITY author    "mfbergmann">
-  <!ENTITY version   "2026.04.04">
+  <!ENTITY version   "2026.10.19">
   <!ENTITY plugdir   "/usr/local/emhttp/plugins/&name;">
   <!ENTITY plugin    "/boot/config/plugins/&name;">
   <!ENTITY pluginURL "https://raw.githubusercontent.com/mfbergmann/unraid-claude-code/main/claude-code.plg">
@@ -17,6 +17,10 @@
         min="6.12.0">
 
 <CHANGES>
+###2026.10.19
+- Fix: never cache the binary under an unmounted /mnt/user. When the array
+  started after the 120s mount wait, the cache write made /mnt/user non-empty
+  and Unraid skipped mounting the user shares (Docker, VMs and shares broken)
 ###2026.04.04
 - Complete rewrite following Unraid community plugin conventions
 - Persistent Claude Code binary cached on array (survives reboots)
@@ -120,6 +124,13 @@ fi
 
 CACHED_BINARY="$APPDATA_PATH/bin/claude"
 
+# Mount point that must be up before anything is written under APPDATA_PATH
+PERSIST_MOUNT="/mnt/user"
+case "$APPDATA_PATH" in
+    /mnt/disks/*)  PERSIST_MOUNT=$(echo "$APPDATA_PATH" | cut -d/ -f1-4) ;;
+    /mnt/cache/*)  PERSIST_MOUNT="/mnt/cache" ;;
+esac
+
 # --- Wait for a mount point to become available ---
 wait_for_mount() {
     local mount_point="$1"
@@ -169,11 +180,17 @@ cache_binary() {
     for candidate in /root/.local/bin/claude /root/.claude/local/bin/claude; do
         [ -x "$candidate" ] && src="$candidate" && break
     done
-    if [ -n "$src" ]; then
-        mkdir -p "$(dirname "$CACHED_BINARY")"
-        cp "$src" "$CACHED_BINARY"
-        log "Cached Claude binary to $CACHED_BINARY"
+    [ -z "$src" ] && return 0
+    # Never write under an unmounted /mnt/user: the files land in RAM and make
+    # the mount point non-empty, so Unraid then skips mounting the user shares
+    # at array start, and every share, Docker and VMs come up broken.
+    if ! mountpoint -q "$PERSIST_MOUNT" 2>/dev/null; then
+        log "WARNING: $PERSIST_MOUNT not mounted; not caching binary."
+        return 0
     fi
+    mkdir -p "$(dirname "$CACHED_BINARY")"
+    cp "$src" "$CACHED_BINARY"
+    log "Cached Claude binary to $CACHED_BINARY"
 }
 
 # --- Install Claude Code ---
@@ -233,14 +250,7 @@ install_claude() {
 setup_persistence() {
     log "Setting up persistent storage at $APPDATA_PATH ..."
 
-    # Determine mount point to wait for
-    local wait_mount="/mnt/user"
-    case "$APPDATA_PATH" in
-        /mnt/disks/*)  wait_mount=$(echo "$APPDATA_PATH" | cut -d/ -f1-4) ;;
-        /mnt/cache/*)  wait_mount="/mnt/cache" ;;
-    esac
-
-    if ! wait_for_mount "$wait_mount" 120; then
+    if ! wait_for_mount "$PERSIST_MOUNT" 120; then
         log "WARNING: Mount not available. Persistence deferred."
         return 1
     fi
